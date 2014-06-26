@@ -1,7 +1,6 @@
 package swisssystem
 
 object Common {
-  // Requires an even number of participants!
   case class Pairing[P](pairs: List[(P,P)], floater: Option[P])
 
   def enumeratePairings[P](participants: List[P]): Stream[Pairing[P]] = {
@@ -24,9 +23,21 @@ object Common {
         })
     }
 
-    enum(participants).map { l =>
+    enum(participants) map { l =>
       val (pairs, fs) = l.partition(p => p._1 != p._2)
       Pairing[P](pairs, fs.headOption.map(_._1))
+    }
+  }
+
+  // Pairings where an external floater cannot be defined as a floater again.
+  // Note that the floater must also be part of the participants list.
+  def enumeratePairings[P](participants: List[P], floater: Option[P]): Stream[Pairing[P]] = {
+    floater.map { f =>
+      enumeratePairings(participants).filter { p =>
+        p.floater != Some(floater)
+      }
+    } getOrElse {
+      enumeratePairings(participants)
     }
   }
 }
