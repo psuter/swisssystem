@@ -34,7 +34,7 @@ object Common {
   def enumeratePairings[P](participants: List[P], floater: Option[P]): Stream[Pairing[P]] = {
     floater.map { f =>
       enumeratePairings(participants).filter { p =>
-        p.floater != Some(floater)
+        p.floater != floater
       }
     } getOrElse {
       enumeratePairings(participants)

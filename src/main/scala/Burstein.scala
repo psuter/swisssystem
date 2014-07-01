@@ -20,9 +20,9 @@ class Burstein[P] private(
       if(c1 != 0) c1 else {
         val c2 = sonnebornBerger(p2) - sonnebornBerger(p1)
         if(c2 != 0) c2 else {
-          val c3 = median(p2) - median(p1)
+          val c3 = buchholtz(p2) - buchholtz(p1)
           if(c3 != 0) c3 else {
-            val c4 = buchholtz(p2) - buchholtz(p1)
+            val c4 = median(p2) - median(p1)
             if(c4 != 0) c4 else {
               players(p2) - players(p1)
             }
@@ -49,27 +49,73 @@ class Burstein[P] private(
     })
   } toMap
 
-  lazy val dueColors: Map[P,Option[Boolean]] = participants map { p =>
-    val d = colorDifferences(p)
-    (p, if(d != 0) {
-      Some(d < 0)
-    } else {
-      colorHistories(p).headOption.map(!_)
-    })
-  } toMap
+  lazy val dueColors: Map[P,Option[Boolean]] = if(results.isEmpty) {
+    standings.zipWithIndex map {
+      case (p, i) => (p, Some(i % 2 == 0))
+    } toMap
+  } else {
+    participants map { p =>
+      val d = colorDifferences(p)
+      (p, if(d != 0) {
+        Some(d < 0)
+      } else {
+        colorHistories.getOrElse(p, Nil).headOption.map(!_)
+      })
+    } toMap
+  }
+
+  // Given a pairing, assign colors.
+  // First return value is whether p1 gets white, second is how many players
+  // get their due color.
+  // This doesn't check the hard constraints. It assumes it has been done before.
+  def assignColors(p1: P, p2: P): (Boolean,Int) = {
+    val d1 = dueColors(p1)
+    val d2 = dueColors(p2)
+
+    (dueColors(p1), dueColors(p2)) match {
+      case (None, None) =>
+        (true, 2) // FIXME: this is not what the rules say. Check whether this actually happens now? Shouldn't, except in weird cases.
+
+      case (Some(c1), None) =>
+        (c1, 2)
+
+      case (None, Some(c2)) =>
+        (!c2, 2)
+
+      case (Some(c1), Some(c2)) if c1 != c2 =>
+        (c1, 2)
+
+      case (Some(c), Some(_)) =>
+        val hs = colorHistories(p1) zip colorHistories(p2)
+        hs dropWhile { p => p._1 == p._2 }
+        hs.headOption.map { p =>
+          (!p._1, 1)
+        } getOrElse {
+          val p1Better = (ordering.compare(p1, p2) <= 0)
+          (c ^ !p1Better, 1)
+        }
+        
+    }
+  }
 
   lazy val standings: List[P] = participants.toList.sorted(ordering)
 
-  lazy val scoreGroups: List[List[P]] = standings.groupBy(scores(_)).toList.sortBy(_._1).map(_._2)
+  lazy val scoreGroups: List[List[P]] = standings.groupBy(scores(_)).toList.sortBy(-_._1).map(_._2)
 
   lazy val opponents: Map[P,Set[P]] = participants map { p =>
     (p, results.keySet.filter(_._1 == p).map(_._2))
   } toMap
 
   lazy val scores: Map[P,Int] = participants map { p =>
-    (p, results collect {
-      case ((p1,_), s) if p1 == p => s
-    } sum)
+    (p, {
+      val scored = results collect {
+        case ((p1,_), s) if p1 == p => s
+      } sum
+
+      val fromByes = if(byed(p)) byeValue else 0
+
+      scored + fromByes
+    })
   } toMap
 
   lazy val sonnebornBerger: Map[P,Int] = participants map { p =>
@@ -103,6 +149,100 @@ class Burstein[P] private(
     lastTwoColors(p2).forall(x => x)
   }
 
+  def validPairings(sg: List[P], df: Option[P]): Stream[Pairing[P]] = {
+    val valid = enumeratePairings(df.fold(sg)(f => f +: sg), df) filter { p =>
+      p.pairs forall {
+        case (p1,p2) => canPlay(p1,p2) || canPlay(p2,p1)
+      }
+    }
+
+    val withCount = valid.map {
+      case p @ Pairing(pairs, f) => (p, pairs.map(p => assignColors(p._1, p._2)._2).sum)
+    } 
+
+    val max = 2 * ((sg.length + df.size) / 2)
+    (0 to max).reverse.toStream.flatMap { s =>
+      withCount.filter(_._2 == max).map(_._1)
+    }
+  }
+
+  // downfloater is not included in sgs.head
+  case class CantUpward() extends Exception
+  def mkPairings(scoreGroups: List[List[P]], downFloater: Option[P]): Stream[Pairing[P]] = {
+    scoreGroups match {
+      case Nil =>
+        assert(downFloater.isEmpty)
+        Pairing[P](Nil, None) #:: Stream.empty
+
+      case sg :: Nil =>
+        val vps = validPairings(sg, downFloater)
+        if(vps.isEmpty) {
+          throw CantUpward()
+        }
+        vps
+
+      case sg :: sg2 :: sgs =>
+        // here maybe filter downfloaters to eliminate those of who have played everyone below?
+        val vps = validPairings(sg, downFloater) 
+        if(vps.isEmpty) {
+          mkPairings((sg ::: sg2) :: sgs, downFloater)
+        } else {
+          for {
+            vp <- vps
+            Pairing(pairs, df) = vp
+            sp <- mkPairings(sg2 :: sgs, df)
+            Pairing(sbpairs, df2) = sp
+          } yield {
+            Pairing(pairs ::: sbpairs, df2)
+          }
+        }
+    }
+  }
+
+  def mkPairingsWrapped(scoreGroups: List[List[P]]): Stream[Pairing[P]] = {
+    scoreGroups match {
+      case Nil =>
+        mkPairings(Nil, None)
+
+      case sg :: Nil => try {
+        mkPairings(scoreGroups, None)
+      } catch {
+        case CantUpward() =>
+          println("Had to give up. Group was: " + sg.mkString("\n"))
+          throw CantUpward()
+      }
+
+      case sg :: sgs => try {
+        mkPairings(scoreGroups, None)
+      } catch {
+        case CantUpward() =>
+          mkPairingsWrapped(scoreGroups.dropRight(2) :+ scoreGroups.takeRight(2).flatten)
+      }
+    }
+  }
+
+  lazy val pairings: Try[Pairing[P]] = {
+    val ps: List[P] = standings
+    // FIXME: bye will be Nil for odd players if they were all byed.
+    val bye: Option[P] = if(ps.size % 2 == 0) None else standings.reverse.find(p => !byed(p))
+
+    // The score groups without the byed player, if any.
+    val sgs = bye.fold(scoreGroups)(b => scoreGroups.map(_.filterNot(_ == b)))
+
+    Try {
+      val best = mkPairingsWrapped(sgs).head
+
+      // Assign colors properly:
+      val assignedPairs = best.pairs.map {
+        case p @ (p1,p2) =>
+          val (p1w, _) = assignColors(p1,p2)
+          if(p1w) p else (p2, p1)
+      }
+
+      Pairing[P](assignedPairs, bye)
+    }
+  }
+
   def withResult(p1: P, s1: Int, p2: P, s2: Int): Try[Burstein[P]] = {
     val newResults = results + ((p1,p2) -> s1) + ((p2,p1) -> s2)
     val newColorHistories = {
@@ -113,31 +253,8 @@ class Burstein[P] private(
 
     Try {
       // TODO: check that the results were for a proper pairing
-      new Burstein[P](players, rounds, byeValue, newResults, newColorHistories)
+      new Burstein[P](players, rounds, byeValue, newResults, newColorHistories, byed)
     }
-  }
-
-  def pairingsForScoreGroup(sg: List[P], downFloater: Option[P]): Stream[Pairing[P]] = {
-    enumeratePairings(downFloater.fold(sg)(df => sg :+ df), downFloater) filter { p =>
-      // check that the pairing does not pit two players who cannot face each other
-      p.pairs forall {
-        case (p1,p2) => canPlay(p1,p2) || canPlay(p2,p1)
-      }
-    }
-  }
-
-  lazy val pairings: Try[Pairing[P]] = {
-    val ps: List[P] = standings
-    // FIXME: bye will be None for odd players if they were all byed.
-    val bye: Option[P] =
-      if(ps.size % 2 == 0) None else standings.reverse.find(p => !byed(p))
-
-    // The score groups without the byed player, if any.
-    val sgs = bye.fold(scoreGroups)(b => scoreGroups.map(_.filterNot(_ == b)))
-
-    // start enumerating like you've never enumerated.
-
-    Try { ??? }
   }
 
   def withBye(p: P): Try[Burstein[P]] = {
