@@ -4,6 +4,8 @@ import scala.util.Try
 
 import Common._
 
+import scala.collection.mutable.{ Map => MutableMap }
+
 class Burstein[P] private(
   val players : Map[P,Int],
   val rounds : Int,
@@ -141,13 +143,27 @@ class Burstein[P] private(
   //  - color constraints:
   //     - diff <= 2
   //     - not 3 times same col. in a row.
+  //
+  // This funtion caches its results, which is important because it is hit repeatedly in the enumeration and acts as a crucial pruning
+  // mechanism there.
+  private val canPlayCache : MutableMap[(P,P),Boolean] = MutableMap.empty
   def canPlay(p1: P, p2: P): Boolean = {
-    !results.isDefinedAt((p1,p2)) &&
-    colorDifferences(p1) < 2 &&
-    colorDifferences(p2) > -2 &&
-    lastTwoColors(p1).forall(x => !x) &&
-    lastTwoColors(p2).forall(x => x)
+    def cp: Boolean = {
+      !results.isDefinedAt((p1,p2)) &&
+      colorDifferences(p1) < 2 &&
+      colorDifferences(p2) > -2 &&
+      lastTwoColors(p1).forall(x => !x) &&
+      lastTwoColors(p2).forall(x => x)
+    }
+  
+    //canPlayCache.getOrElse((p1,p2), {
+    //  val c = cp
+    //  canPlayCache((p1,p2)) = c
+    //  c
+    //})
+    cp
   }
+
 
   def validPairings(sg: List[P], df: Option[P]): Stream[Pairing[P]] = {
     val valid = enumeratePairings(df.fold(sg)(f => f +: sg), df) filter { p =>
@@ -157,12 +173,12 @@ class Burstein[P] private(
     }
 
     val withCount = valid.map {
-      case p @ Pairing(pairs, f) => (p, pairs.map(p => assignColors(p._1, p._2)._2).sum)
+      case p @ Pairing(pairs, _) => (p, pairs.map(p => assignColors(p._1, p._2)._2).sum)
     } 
 
     val max = 2 * ((sg.length + df.size) / 2)
     (0 to max).reverse.toStream.flatMap { s =>
-      withCount.filter(_._2 == max).map(_._1)
+      withCount.filter(_._2 == s).map(_._1)
     }
   }
 
