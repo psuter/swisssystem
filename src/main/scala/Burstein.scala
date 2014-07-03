@@ -273,6 +273,7 @@ class Burstein[P] private(
 
     Try {
       // TODO: check that the results were for a proper pairing
+      assert(!results.isDefinedAt((p1,p2)) && !results.isDefinedAt((p2,p1)))
       new Burstein[P](players, rounds, byeValue, newResults, newColorHistories, byed)
     }
   }
@@ -280,6 +281,7 @@ class Burstein[P] private(
   def withBye(p: P): Try[Burstein[P]] = {
     Try {
       // TODO check that the player hasn't been byed before
+      assert(!byed(p))
       new Burstein[P](players, rounds, byeValue, results, colorHistories, byed + p)
     }
   }
