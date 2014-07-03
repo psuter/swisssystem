@@ -1,7 +1,6 @@
 package swisssystem
 
 object Common {
-  case class Pairing[P](pairs: List[(P,P)], floater: Option[P])
 
   def enumeratePairings[P](participants: List[P]): Stream[Pairing[P]] = {
     // Internal worker function, where floaters are represented as paired with themselves.
@@ -34,7 +33,7 @@ object Common {
   def enumeratePairings[P](participants: List[P], floater: Option[P]): Stream[Pairing[P]] = {
     floater.map { f =>
       enumeratePairings(participants).filter { p =>
-        p.floater != floater
+        p.unpaired != floater
       }
     } getOrElse {
       enumeratePairings(participants)

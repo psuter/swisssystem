@@ -3,7 +3,7 @@ package test
 
 import org.specs2.mutable._
 
-import Common.{ Pairing, enumeratePairings }
+import Common.enumeratePairings
 
 class CommonTests extends Specification {
   "Enumeration of pairs for even participants" should {

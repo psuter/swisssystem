@@ -3,17 +3,22 @@ package swisssystem
 import scala.util.Try
 
 trait Tournament[P] {
-  //def participants : Iterable[P]
+  def participants: Iterable[P]
 
-  //def standings : Map[P,Int]
+  // Current standings, sorted by decreasing score, perf. rating, etc.
+  def standings: Seq[P]
 
-  //def rounds : Int
+  def scores: Map[P,Int]
 
-  //def withResult(p1 : P, v1 : Int, p2 : P, v2 : Int) : Try[Tournament[P]]
+  // Performance rating, typically used to break ties for equal scores.
+  def performances: Map[P,Int]
 
-  //def pairings : Seq[(P,P)]
+  // Pairings for the next round.
+  def pairings : Try[Pairing[P]]
 
-  //def bye : Option[P]
+  def withResult(p1 : P, v1 : Int, p2 : P, v2 : Int) : Try[Tournament[P]]
+
+  def withBye(p: P): Try[Tournament[P]]
 }
 
 object Tournament {

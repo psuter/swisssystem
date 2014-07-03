@@ -14,7 +14,7 @@ class Burstein[P] private(
   val colorHistories: Map[P,List[Boolean]] = Map.empty[P,List[Boolean]],
   val byed: Set[P] = Set.empty[P]
 ) extends Tournament[P] {
-  val participants : Iterable[P] = players.keySet.toList
+  lazy val participants : Iterable[P] = players.keySet.toList
 
   private val ordering: Ordering[P] = new Ordering[P] {
     def compare(p1: P, p2: P): Int = {
@@ -76,7 +76,10 @@ class Burstein[P] private(
 
     (dueColors(p1), dueColors(p2)) match {
       case (None, None) =>
-        (true, 2) // FIXME: this is not what the rules say. Check whether this actually happens now? Shouldn't, except in weird cases.
+        // FIXME: this is not what the rules say. Check whether this actually
+        // happens now? Shouldn't, except in weird cases with late
+        // entrants.
+        (true, 2)
 
       case (Some(c1), None) =>
         (c1, 2)
@@ -126,6 +129,8 @@ class Burstein[P] private(
     } sum)
   } toMap
 
+  lazy val performances: Map[P,Int] = sonnebornBerger
+
   lazy val median: Map[P,Int] = participants map { p =>
     val rs = results collect {
       case ((p1,_), s) if p1 == p => s
@@ -146,7 +151,7 @@ class Burstein[P] private(
   //
   // This funtion caches its results, which is important because it is hit repeatedly in the enumeration and acts as a crucial pruning
   // mechanism there.
-  private val canPlayCache : MutableMap[(P,P),Boolean] = MutableMap.empty
+  // private val canPlayCache : MutableMap[(P,P),Boolean] = MutableMap.empty
   def canPlay(p1: P, p2: P): Boolean = {
     def cp: Boolean = {
       !results.isDefinedAt((p1,p2)) &&
@@ -163,7 +168,6 @@ class Burstein[P] private(
     //})
     cp
   }
-
 
   def validPairings(sg: List[P], df: Option[P]): Stream[Pairing[P]] = {
     val valid = enumeratePairings(df.fold(sg)(f => f +: sg), df) filter { p =>
