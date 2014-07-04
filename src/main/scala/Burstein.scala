@@ -228,7 +228,7 @@ class Burstein[P] private(
         mkPairings(scoreGroups, None)
       } catch {
         case CantUpward() =>
-          println("Had to give up. Group was: " + sg.mkString("\n"))
+          //println("Had to give up. Group was: " + sg.mkString("\n"))
           throw CantUpward()
       }
 

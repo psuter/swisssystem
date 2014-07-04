@@ -75,9 +75,37 @@ class TournamentTests extends Specification {
       true must_== true
     }
 
-    "run smoothly 100x with exactly enough players" in {
+    "run smoothly 100x with exactly enough players (even)" in {
       for(i <- 0 until 100) {
         runTournament(314159 + i, 8, 7, 2) must beSuccessfulTry
+      }
+      true must_== true
+    }
+
+    "run smoothly 100x with exactly enough players (odd)" in {
+      for(i <- 0 until 100) {
+        runTournament(314159 + i, 7, 7, 2) must beSuccessfulTry
+      }
+      true must_== true
+    }
+
+    "run smoothly 100x with one player extra" in {
+      for(i <- 0 until 100) {
+        runTournament(314159 + i, 9, 7, 2) must beSuccessfulTry
+      }
+      true must_== true
+    }
+
+    "fail consistently 100x with too few players (even)" in {
+      for(i <- 0 until 100) {
+        runTournament(279543 + i, 8, 8, 2) must beFailedTry
+      }
+      true must_== true
+    }
+
+    "fail consistently 100x with too few players (odd)" in {
+      for(i <- 0 until 100) {
+        runTournament(279543 + i, 7, 8, 2) must beFailedTry
       }
       true must_== true
     }
