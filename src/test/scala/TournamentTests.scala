@@ -29,7 +29,7 @@ class TournamentTests extends Specification {
   }
 
   // Plays a tournament with players with a realistic rating distribution and believable outcomes.
-  def runTournament(randSeed: Int, numPlayers: Int, numRounds: Int, byeValue: Int): Try[Tournament[String]] = {
+  def runTournament(randSeed: Int, numPlayers: Int, numRounds: Int): Try[Tournament[String]] = {
     val rand = new Random(42)
     val names: List[String] = ('A' until ('A' + numPlayers).toChar).map(_.toString).toList
     val players: Map[String,Int] = names.map { n =>
@@ -37,7 +37,7 @@ class TournamentTests extends Specification {
     } toMap
 
     def playAllGamesAndByes(t: Tournament[String], pairings: Pairing[String]) = {
-      val withBye = pairings.unpaired.fold(Try(t))(p => t.withBye(p))
+      val withBye = pairings.unpaired.fold(Try(t))(p => t.withBye(p, 2))
 
       pairings.pairs.foldLeft(withBye) { (tt, p) =>
         val s1 = randOutcome(rand, players(p._1), players(p._2))
@@ -47,7 +47,7 @@ class TournamentTests extends Specification {
     }
 
 
-    val tStart = Try(Tournament.create(players, numRounds, byeValue))
+    val tStart = Try(Tournament.create(players))
 
     val tEnd = (0 until numRounds).foldLeft(tStart) { (tt, i) =>
       for {
@@ -63,49 +63,49 @@ class TournamentTests extends Specification {
   "A tournament" should {
     "run smoothly 100x with odd number of players" in {
       for(i <- 0 until 100) {
-        runTournament(424242 + i, 11, 7, 2) must beSuccessfulTry
+        runTournament(424242 + i, 11, 7) must beSuccessfulTry
       }
       true must_== true
     }
 
     "run smoothly 100x with even number of players" in {
       for(i <- 0 until 100) {
-        runTournament(151049 + i, 30, 7, 2) must beSuccessfulTry
+        runTournament(151049 + i, 30, 7) must beSuccessfulTry
       }
       true must_== true
     }
 
     "run smoothly 100x with exactly enough players (even)" in {
       for(i <- 0 until 100) {
-        runTournament(314159 + i, 8, 7, 2) must beSuccessfulTry
+        runTournament(314159 + i, 8, 7) must beSuccessfulTry
       }
       true must_== true
     }
 
     "run smoothly 100x with exactly enough players (odd)" in {
       for(i <- 0 until 100) {
-        runTournament(314159 + i, 7, 7, 2) must beSuccessfulTry
+        runTournament(314159 + i, 7, 7) must beSuccessfulTry
       }
       true must_== true
     }
 
     "run smoothly 100x with one player extra" in {
       for(i <- 0 until 100) {
-        runTournament(314159 + i, 9, 7, 2) must beSuccessfulTry
+        runTournament(314159 + i, 9, 7) must beSuccessfulTry
       }
       true must_== true
     }
 
     "fail consistently 100x with too few players (even)" in {
       for(i <- 0 until 100) {
-        runTournament(279543 + i, 8, 8, 2) must beFailedTry
+        runTournament(279543 + i, 8, 8) must beFailedTry
       }
       true must_== true
     }
 
     "fail consistently 100x with too few players (odd)" in {
       for(i <- 0 until 100) {
-        runTournament(279543 + i, 7, 8, 2) must beFailedTry
+        runTournament(279543 + i, 7, 8) must beFailedTry
       }
       true must_== true
     }

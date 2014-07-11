@@ -17,7 +17,7 @@ class BursteinTests extends Specification {
 
   "This simple tournament" should {
 
-    val t0 = Try(Burstein.create[String](players, 2, 1))
+    val t0 = Try(Burstein.create[String](players))
 
     "compute standings correctly before first round" in {
       t0.get.standings.toList == List("Mike", "Joe", "Perry", "Mark")
@@ -91,7 +91,7 @@ class BursteinTests extends Specification {
       "Grisha" -> 2590
     )
 
-    val t1 = Try { Burstein.create(players, 3, 2) }
+    val t1 = Try { Burstein.create(players) }
 
     "produce correct standings before the first round" in {
       t1.get.standings must_== List("Grisha", "Ernest", "Carry", "Alfred", "Dieter", "Bruce", "Frank")
@@ -112,7 +112,7 @@ class BursteinTests extends Specification {
       tb <- ta.withResult("Grisha", 2, "Bruce", 0)
       tc <- tb.withResult("Dieter", 0, "Ernest", 2)
       td <- tc.withResult("Carry",  1, "Alfred", 1)
-      te <- td.withBye("Frank")
+      te <- td.withBye("Frank", 2)
     } yield te
 
     "accept first round results" in { t2 must beSuccessfulTry }
@@ -137,7 +137,7 @@ class BursteinTests extends Specification {
       tb <- ta.withResult("Frank",  0, "Grisha", 2)
       tc <- tb.withResult("Ernest", 1, "Carry", 1)
       td <- tc.withResult("Alfred", 1, "Dieter", 1)
-      te <- td.withBye("Bruce")
+      te <- td.withBye("Bruce", 2)
     } yield te
 
     "accept second round results" in { t3 must beSuccessfulTry }
@@ -162,7 +162,7 @@ class BursteinTests extends Specification {
       tb <- ta.withResult("Grisha", 1, "Ernest", 1)
       tc <- tb.withResult("Carry",  2, "Frank",  0)
       td <- tc.withResult("Bruce",  0, "Alfred", 2)
-      te <- td.withBye("Dieter")
+      te <- td.withBye("Dieter", 2)
     } yield te
 
     "accept third round results" in { t4 must beSuccessfulTry }

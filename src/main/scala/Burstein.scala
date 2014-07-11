@@ -8,11 +8,9 @@ import scala.collection.mutable.{ Map => MutableMap }
 
 class Burstein[P] private(
   val players : Map[P,Int],
-  val rounds : Int,
-  val byeValue : Int,
   val results: Map[(P,P),Int] = Map.empty[(P,P),Int],
   val colorHistories: Map[P,List[Boolean]] = Map.empty[P,List[Boolean]],
-  val byed: Set[P] = Set.empty[P]
+  val byed: Map[P,Int] = Map.empty[P,Int]
 ) extends Tournament[P] {
   lazy val participants : Iterable[P] = players.keySet.toList
 
@@ -117,7 +115,7 @@ class Burstein[P] private(
         case ((p1,_), s) if p1 == p => s
       } sum
 
-      val fromByes = if(byed(p)) byeValue else 0
+      val fromByes = byed.getOrElse(p, 0)
 
       scored + fromByes
     })
@@ -148,25 +146,12 @@ class Burstein[P] private(
   //  - color constraints:
   //     - diff <= 2
   //     - not 3 times same col. in a row.
-  //
-  // This funtion caches its results, which is important because it is hit repeatedly in the enumeration and acts as a crucial pruning
-  // mechanism there.
-  // private val canPlayCache : MutableMap[(P,P),Boolean] = MutableMap.empty
   def canPlay(p1: P, p2: P): Boolean = {
-    def cp: Boolean = {
-      !results.isDefinedAt((p1,p2)) &&
-      colorDifferences(p1) < 2 &&
-      colorDifferences(p2) > -2 &&
-      lastTwoColors(p1).forall(x => !x) &&
-      lastTwoColors(p2).forall(x => x)
-    }
-  
-    //canPlayCache.getOrElse((p1,p2), {
-    //  val c = cp
-    //  canPlayCache((p1,p2)) = c
-    //  c
-    //})
-    cp
+    !results.isDefinedAt((p1,p2)) &&
+    colorDifferences(p1) < 2 &&
+    colorDifferences(p2) > -2 &&
+    lastTwoColors(p1).forall(x => !x) &&
+    lastTwoColors(p2).forall(x => x)
   }
 
   def validPairings(sg: List[P], df: Option[P]): Stream[Pairing[P]] = {
@@ -241,13 +226,22 @@ class Burstein[P] private(
     }
   }
 
-  lazy val pairings: Try[Pairing[P]] = {
-    val ps: List[P] = standings
-    // FIXME: bye will be Nil for odd players if they were all byed.
-    val bye: Option[P] = if(ps.size % 2 == 0) None else standings.reverse.find(p => !byed(p))
+  private def getByed(players: Set[P]): Option[P] = {
+    if(players.size % 2 == 0) None else {
+      // Can't be empty.
+      val min = players.toList.map(p => byed.getOrElse(p, 0)).min
+      standings.reverse.find(p => players(p) && byed.getOrElse(p, 0) == min)
+    }  
+  }
 
-    // The score groups without the byed player, if any.
-    val sgs = bye.fold(scoreGroups)(b => scoreGroups.map(_.filterNot(_ == b)))
+  def pairings: Try[Pairing[P]] = pairings(players.keySet)
+
+  def pairings(active: Set[P]): Try[Pairing[P]] = {
+    val bye: Option[P] = getByed(active)
+    val notByed: Set[P] = active -- bye
+
+    // The score groups with only the subset of players, and without the bye.
+    val sgs = scoreGroups.map(_.filter(notByed))
 
     Try {
       val best = mkPairingsWrapped(sgs).head
@@ -269,41 +263,36 @@ class Burstein[P] private(
       val h1 =  true :: colorHistories.getOrElse(p1, Nil)
       val h2 = false :: colorHistories.getOrElse(p2, Nil)
       colorHistories + (p1 -> h1) + (p2 -> h2)
-    }    
+    }
 
     Try {
       // TODO: check that the results were for a proper pairing
       assert(!results.isDefinedAt((p1,p2)) && !results.isDefinedAt((p2,p1)))
-      new Burstein[P](players, rounds, byeValue, newResults, newColorHistories, byed)
+      new Burstein[P](players, newResults, newColorHistories, byed)
     }
   }
 
-  def withBye(p: P): Try[Burstein[P]] = {
+  def withBye(p: P, v: Int): Try[Burstein[P]] = {
     Try {
-      // TODO check that the player hasn't been byed before
-      assert(!byed(p))
-      new Burstein[P](players, rounds, byeValue, results, colorHistories, byed + p)
+      val bb = byed.getOrElse(p, 0)
+      new Burstein[P](players, results, colorHistories, byed + (p -> (bb+v)))
     }
   }
 
 }
 
 object Burstein {
-  def create[P : Ordering](players: Set[P], rounds: Int, byeValue: Int) = new Burstein[P](
+  def create[P : Ordering](players: Set[P]) = new Burstein[P](
     players.toList.sorted.reverse.zipWithIndex.toMap,
-    rounds,
-    byeValue,
     Map.empty,
     Map.empty,
-    Set.empty
+    Map.empty
   )
 
-  def create[P](players: Map[P,Int], rounds: Int, byeValue: Int) = new Burstein[P](
+  def create[P](players: Map[P,Int]) = new Burstein[P](
     players,
-    rounds,
-    byeValue,
     Map.empty,
     Map.empty,
-    Set.empty
+    Map.empty
   )
 }

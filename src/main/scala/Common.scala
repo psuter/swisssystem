@@ -1,10 +1,9 @@
 package swisssystem
 
 object Common {
-
   def enumeratePairings[P](participants: List[P]): Stream[Pairing[P]] = {
     // Internal worker function, where floaters are represented as paired with themselves.
-    def enum[P](pp: List[P]): Stream[List[(P,P)]] = pp match {
+    def enum(pp: List[P]): Stream[List[(P,P)]] = pp match {
       case Nil => Nil #:: Stream.empty
 
       case p :: Nil => ((p,p) :: Nil) #:: Stream.empty
