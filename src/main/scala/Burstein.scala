@@ -97,7 +97,7 @@ class Burstein[P] private(
           val p1Better = (ordering.compare(p1, p2) <= 0)
           (c ^ !p1Better, 1)
         }
-        
+
     }
   }
 
@@ -163,7 +163,7 @@ class Burstein[P] private(
 
     val withCount = valid.map {
       case p @ Pairing(pairs, _) => (p, pairs.map(p => assignColors(p._1, p._2)._2).sum)
-    } 
+    }
 
     val max = 2 * ((sg.length + df.size) / 2)
     (0 to max).reverse.toStream.flatMap { s =>
@@ -172,7 +172,7 @@ class Burstein[P] private(
   }
 
   // downfloater is not included in sgs.head
-  case class CantUpward() extends Exception
+  case object CantUpward extends Exception
   def mkPairings(scoreGroups: List[List[P]], downFloater: Option[P]): Stream[Pairing[P]] = {
     scoreGroups match {
       case Nil =>
@@ -182,13 +182,13 @@ class Burstein[P] private(
       case sg :: Nil =>
         val vps = validPairings(sg, downFloater)
         if(vps.isEmpty) {
-          throw CantUpward()
+          throw CantUpward
         }
         vps
 
       case sg :: sg2 :: sgs =>
         // here maybe filter downfloaters to eliminate those of who have played everyone below?
-        val vps = validPairings(sg, downFloater) 
+        val vps = validPairings(sg, downFloater)
         if(vps.isEmpty) {
           mkPairings((sg ::: sg2) :: sgs, downFloater)
         } else {
@@ -212,15 +212,15 @@ class Burstein[P] private(
       case sg :: Nil => try {
         mkPairings(scoreGroups, None)
       } catch {
-        case CantUpward() =>
+        case CantUpward =>
           //println("Had to give up. Group was: " + sg.mkString("\n"))
-          throw CantUpward()
+          throw CantUpward
       }
 
       case sg :: sgs => try {
         mkPairings(scoreGroups, None)
       } catch {
-        case CantUpward() =>
+        case CantUpward =>
           mkPairingsWrapped(scoreGroups.dropRight(2) :+ scoreGroups.takeRight(2).flatten)
       }
     }
@@ -231,7 +231,7 @@ class Burstein[P] private(
       // Can't be empty.
       val min = players.toList.map(p => byed.getOrElse(p, 0)).min
       standings.reverse.find(p => players(p) && byed.getOrElse(p, 0) == min)
-    }  
+    }
   }
 
   def pairings: Try[Pairing[P]] = pairings(players.keySet)
